@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<div class="auth-wrapper">
+    <div class="auth-container">
+        <h1><i class="fas fa-robot"></i> Chatbot</h1>
+        <h2>Create a new account</h2>
+
+        <% if (locals.msg) { %>
+        <div class="error-msg" style="background:#dcfce7; color:#166534;">
+            <i class="fas fa-check-circle"></i> <%= msg %>
+        </div>
+        <% } %>
+
+        <form method="POST" action="/register">
+            <div class="form-group">
+                <input type="text" name="name" placeholder="Name" required>
+            </div>
+
+            <div class="form-group">
+                <input type="email" name="email" placeholder="Email Address" required>
+            </div>
+
+            <div class="form-group">
+                <input type="password" name="password" placeholder="Password" required>
+            </div>
+
+            <button type="submit" class="auth-btn">Register</button>
+            <div style="margin: 10px 0; color: var(--text-secondary); text-align: center;">OR</div>
+            <a href="/guest" style="text-decoration: none;">
+                <button type="button" class="auth-btn" style="background-color: var(--text-secondary); margin-top: 0;"><i class="fas fa-user-secret"></i> Continue as Guest</button>
+            </a>
+        </form>
+
+        <div class="auth-links">
+            Already have an account? <a href="/">Login here</a>
+        </div>
+    </div>
+</div>
+
+<div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+        <h1 class="splash-title">Chatbot</h1>
+        <div class="splash-subtitle">A New Conversation Experience</div>
+    </div>
+</div>
+
+<script>
+    // Apply saved theme on load
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    // Splash screen logic
+    document.addEventListener("DOMContentLoaded", () => {
+        const splash = document.getElementById('splash-screen');
+        if (!sessionStorage.getItem('splashShown')) {
+            setTimeout(() => {
+                splash.classList.add('hidden');
+                setTimeout(() => splash.remove(), 1000); // Wait for transition
+                sessionStorage.setItem('splashShown', 'true');
+            }, 3000); // Show splash for 3 seconds
+        } else {
+            splash.remove();
+        }
+    });
+</script>
+
+</body>
+</html>

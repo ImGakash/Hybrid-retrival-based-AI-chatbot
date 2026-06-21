@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>chatbot, A Hybrid AI-Powered Retrieval Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Markdown Parser & Syntax Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-brain" style="font-size: 28px; color: var(--primary-color);"></i>
+            <h2>chatbot</h2>
+        </div>
+        
+        <button class="new-chat-btn" onclick="clearChat()">
+            <i class="fas fa-plus"></i> New Conversation
+        </button>
+        
+        <div class="history-list" id="historyList">
+            <!-- Chat history will be loaded here dynamically -->
+        </div>
+        
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar"><%= username[0].toUpperCase() %></div>
+                <span><%= username %></span>
+            </div>
+            
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <i class="fas fa-moon" id="themeIcon"></i> Toggle Theme
+            </button>
+            
+            <button class="theme-toggle" onclick="openNotesModal()">
+                <i class="fas fa-bookmark"></i> Saved Notes
+            </button>
+            
+            <a href="/logout" style="text-decoration: none;">
+                <button class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="main-chat">
+        <header class="chat-header">
+            <h3>chatbot, A Hybrid AI-Powered Retrieval Chatbot</h3>
+            <button class="faq-btn" onclick="askQuestion('What are your capabilities?')">
+                <i class="fas fa-bolt"></i> Capabilities
+            </button>
+        </header>
+
+        <div class="chat-container" id="chatBox">
+            <!-- Welcome Screen initially shown if chat is empty -->
+            <div class="welcome-screen" id="welcomeScreen">
+                <i class="fas fa-microchip welcome-icon"></i>
+                <h2>How can I help you today, <%= username %>?</h2>
+                <p>I can assist with queries, analyze images, and generate formatted content.</p>
+                
+                <div class="faq-suggestions">
+                    <button class="faq-btn" onclick="askQuestion('What courses are available?')">Available Courses</button>
+                    <button class="faq-btn" onclick="askQuestion('What is the admission process?')">Admission Info</button>
+                    <button class="faq-btn" onclick="askQuestion('Write a python script to reverse a string')">Python Script</button>
+                    <button class="faq-btn" onclick="askQuestion('Explain quantum computing simply')">Quantum Computing</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="file-preview-container" id="filePreviewContainer"></div>
+            <div class="input-box">
+                <input type="file" id="fileInput" accept="image/*,application/pdf" style="display:none;" onchange="handleFileSelect(event)">
+                <button class="action-btn" onclick="document.getElementById('fileInput').click()" title="Attach File">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                
+                <textarea id="userInput" placeholder="Ask a question or upload an image..." rows="1" onkeypress="handleKeyPress(event)" oninput="autoResize(this)"></textarea>
+                
+                <button class="action-btn" id="micBtn" onclick="toggleVoiceInput()" title="Voice Input">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <i class="fas fa-arrow-up"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <h1 class="splash-title">chatbot</h1>
+            <div class="splash-subtitle">A Hybrid AI-Powered Retrieval Chatbot</div>
+        </div>
+    </div>
+
+    <!-- Notes Modal -->
+    <div id="notesModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeNotesModal()">&times;</span>
+            <h2 style="margin-bottom: 20px; color: var(--primary-color);">My Saved Notes</h2>
+            <div id="notesContainer" class="notes-container">
+                <p>Loading...</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // Initialize Markdown Parser with Syntax Highlighting
+    marked.setOptions({
+        highlight: function(code, lang) {
+            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(code, { language }).value;
+        },
+        langPrefix: 'hljs language-',
+        breaks: true,
+        gfm: true
+    });
+
+    const chatBox = document.getElementById("chatBox");
+    const userInput = document.getElementById("userInput");
+    const welcomeScreen = document.getElementById("welcomeScreen");
+    const sendBtn = document.getElementById("sendBtn");
+    const historyList = document.getElementById("historyList");
+    
+    // Auto-resize textarea
+    function autoResize(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+    }
+
+    // Theme setup
+    const themeIcon = document.getElementById("themeIcon");
+    const savedTheme = localStorage.getItem('theme') || 'dark'; // default to dark now
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+
+    // Splash screen logic
+    document.addEventListener("DOMContentLoaded", () => {
+        const splash = document.getElementById('splash-screen');
+        if (!sessionStorage.getItem('splashShown')) {
+            setTimeout(() => {
+                splash.classList.add('hidden');
+                setTimeout(() => splash.remove(), 1000);
+                sessionStorage.setItem('splashShown', 'true');
+            }, 3000);
+        } else {
+            splash.remove();
+        }
+        
+        // Initialize sessions from backend
+        fetchSessions();
+    });
+
+    function openNotesModal() {
+        document.getElementById('notesModal').classList.add('show');
+        fetchNotes();
+    }
+
+    function closeNotesModal() {
+        document.getElementById('notesModal').classList.remove('show');
+    }
+
+    function fetchNotes() {
+        fetch('/api/notes')
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('notesContainer');
+            container.innerHTML = '';
+            if (data.notes && data.notes.length > 0) {
+                data.notes.forEach(note => {
+                    const parsedHtml = marked.parse(note.response_text);
+                    container.innerHTML += `
+                        <div class="note-card">
+                            <h4>${note.topic}</h4>
+                            <span class="note-time">${note.saved_at}</span>
+                            <div style="font-size: 14px;">${parsedHtml}</div>
+                        </div>
+                    `;
+                });
+            } else {
+                container.innerHTML = '<p>No saved notes found.</p>';
+            }
+        })
+        .catch(err => {
+            document.getElementById('notesContainer').innerHTML = '<p>Error loading notes.</p>';
+        });
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        let modal = document.getElementById('notesModal');
+        if (event.target == modal) {
+            closeNotesModal();
+        }
+    }
+
+    let conversations = [];
+    let currentSessionId = null;
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+    }
+    
+    function updateThemeIcon(theme) {
+        if(theme === 'dark') {
+            themeIcon.className = "fas fa-sun";
+        } else {
+            themeIcon.className = "fas fa-moon";
+        }
+    }
+
+    function askQuestion(question) {
+        userInput.value = question;
+        autoResize(userInput);
+        sendMessage();
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    function scrollToBottom() {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function fetchSessions() {
+        fetch('/api/sessions')
+        .then(res => res.json())
+        .then(data => {
+            if(data.sessions) {
+                conversations = data.sessions;
+                renderHistoryList();
+                if(conversations.length > 0) {
+                    switchSession(conversations[0].session_id);
+                } else {
+                    createNewSession();
+                }
+            }
+        });
+    }
+
+    function renderHistoryList() {
+        historyList.innerHTML = '';
+        if (conversations.length === 0) {
+            const div = document.createElement("div");
+            div.className = "history-item";
+            div.innerHTML = `<i class="far fa-message"></i> No recent sessions`;
+            historyList.appendChild(div);
+            return;
+        }
+        
+        const timelineContainer = document.createElement("div");
+        timelineContainer.className = "timeline-container";
+        
+        conversations.forEach((conv, index) => {
+            const node = document.createElement("div");
+            node.className = "timeline-node " + (conv.session_id == currentSessionId ? "active" : "");
+            
+            const displayTitle = conv.title.length > 25 ? conv.title.substring(0, 25) + '...' : conv.title;
+            // parse date if available
+            let timeDisplay = 'Just now';
+            if (conv.start_time) {
+                // assume 'YYYY-MM-DD HH:MM:SS'
+                timeDisplay = conv.start_time.split(' ')[0]; // Just the date
+            }
+            
+            node.innerHTML = `
+                <div class="timeline-dot"></div>
+                ${index < conversations.length - 1 ? '<div class="timeline-line"></div>' : ''}
+                <div class="timeline-content" onclick="switchSession(${conv.session_id})">
+                    <div class="timeline-header">
+                        <span class="timeline-time">${timeDisplay}</span>
+                        <button class="delete-session-btn" onclick="deleteSession(${conv.session_id}, event)" title="Delete Session">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="timeline-title">${displayTitle}</div>
+                </div>
+            `;
+            timelineContainer.appendChild(node);
+        });
+        historyList.appendChild(timelineContainer);
+    }
+
+    function switchSession(id) {
+        currentSessionId = id;
+        
+        const messages = document.querySelectorAll('.message');
+        messages.forEach(m => m.remove());
+        
+        fetch('/api/sessions/' + id + '/messages')
+        .then(res => res.json())
+        .then(data => {
+            if(data.messages && data.messages.length > 0) {
+                welcomeScreen.style.display = 'none';
+                data.messages.forEach(msg => {
+                    appendMessageToDOM(msg.message_text, msg.sender_type, msg.time, null, msg.sender_type === 'bot', msg.message_id);
+                });
+            } else {
+                welcomeScreen.style.display = 'flex';
+            }
+            renderHistoryList();
+            scrollToBottom();
+        });
+    }
+
+    function createNewSession() {
+        fetch('/api/sessions', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if(data.session_id) {
+                currentSessionId = data.session_id;
+                conversations.unshift({ session_id: currentSessionId, title: "New Session" });
+                
+                const messages = document.querySelectorAll('.message');
+                messages.forEach(m => m.remove());
+                welcomeScreen.style.display = 'flex';
+                
+                renderHistoryList();
+            }
+        });
+    }
+
+    function clearChat() {
+        createNewSession();
+    }
+
+    function deleteSession(id, event) {
+        if (event) event.stopPropagation();
+        if (!confirm("Are you sure you want to delete this session?")) return;
+        
+        fetch('/api/sessions/' + id, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                conversations = conversations.filter(c => c.session_id !== id);
+                if (currentSessionId === id) {
+                    if (conversations.length > 0) {
+                        switchSession(conversations[0].session_id);
+                    } else {
+                        createNewSession();
+                    }
+                } else {
+                    renderHistoryList();
+                }
+            } else {
+                alert("Failed to delete session.");
+            }
+        });
+    }
+
+    function saveNote(contentId) {
+        fetch("/api/notes/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ content_id: contentId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+        });
+    }
+
+    function appendMessageToDOM(text, sender, timeString, contentId, parseMarkdown = false, messageId = null) {
+        if (welcomeScreen.style.display !== 'none') {
+            welcomeScreen.style.display = 'none';
+        }
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message " + sender;
+        if (messageId) {
+            msgDiv.setAttribute('data-message-id', messageId);
+        }
+        
+        let saveHtml = "";
+        if (sender === "bot" && contentId) {
+            saveHtml = `<button onclick="saveNote(` + contentId + `)" style="margin-top: 12px; font-size: 11px; padding: 6px 12px; background: var(--sidebar-bg); border: 1px solid var(--primary-color); border-radius: 12px; cursor: pointer; color: var(--primary-color); font-weight: 600; display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-bookmark"></i> Save Note</button>`;
+        }
+
+        // Parse file metadata pattern: [file:url|mime|name]
+        const fileRegex = /(?:\r?\n)?\[file:([^|\]]+)\|([^|\]]+)\|([^\]]+)\]$/;
+        const fileMatch = text.match(fileRegex);
+        
+        let cleanText = text;
+        let fileHtml = "";
+        
+        if (fileMatch) {
+            const fileUrl = fileMatch[1];
+            const mimeType = fileMatch[2];
+            const filename = fileMatch[3];
+            
+            cleanText = text.replace(fileRegex, "").trim();
+            
+            if (mimeType.startsWith("image/")) {
+                fileHtml = `<img src="${fileUrl}" class="chat-image" alt="${filename}">`;
+            } else if (mimeType === "application/pdf") {
+                fileHtml = `
+                    <a href="${fileUrl}" target="_blank" class="chat-attachment pdf">
+                        <i class="fas fa-file-pdf chat-attachment-icon"></i>
+                        <div class="chat-attachment-info">
+                            <span class="chat-attachment-name">${filename}</span>
+                            <span class="chat-attachment-size">View PDF Document</span>
+                        </div>
+                    </a>
+                `;
+            } else {
+                fileHtml = `
+                    <a href="${fileUrl}" target="_blank" class="chat-attachment generic">
+                        <i class="fas fa-file-alt chat-attachment-icon" style="color: var(--primary-color);"></i>
+                        <div class="chat-attachment-info">
+                            <span class="chat-attachment-name">${filename}</span>
+                            <span class="chat-attachment-size">Download File</span>
+                        </div>
+                    </a>
+                `;
+            }
+        }
+
+        // Use marked.parse if it's a bot message
+        let displayHtml = cleanText;
+        if (parseMarkdown && cleanText) {
+            displayHtml = marked.parse(cleanText);
+        } else if (!cleanText && fileHtml) {
+            displayHtml = "";
+        }
+        
+        let editHtml = "";
+        if (sender === "user" && messageId) {
+            editHtml = `<button class="edit-msg-btn" onclick="enableEdit(${messageId})" title="Edit Message"><i class="fas fa-edit"></i></button>`;
+        }
+
+        msgDiv.innerHTML = `
+            <div class="bubble" style="position: relative;">
+                <div class="message-content" id="msg-content-${messageId || Math.random()}" data-raw-text="${escapeHtml(cleanText)}">
+                    ${displayHtml}
+                    ${fileHtml}
+                </div>
+                ${saveHtml}
+                ${editHtml}
+                <span class="message-time">${timeString}</span>
+            </div>
+        `;
+        
+        chatBox.appendChild(msgDiv);
+        scrollToBottom();
+        return msgDiv;
+    }
+
+    
+    function escapeHtml(unsafe) {
+        if(!unsafe) return "";
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
+    
+    function enableEdit(messageId) {
+        const contentDiv = document.getElementById('msg-content-' + messageId);
+        if(!contentDiv) return;
+        const rawText = contentDiv.getAttribute('data-raw-text') || contentDiv.innerText;
+        
+        const editContainer = document.createElement('div');
+        editContainer.className = 'edit-container';
+        editContainer.innerHTML = `
+            <textarea class="edit-textarea" id="edit-textarea-${messageId}">${rawText}</textarea>
+            <div class="edit-actions">
+                <button class="edit-save-btn" onclick="saveEdit(${messageId})">Save</button>
+                <button class="edit-cancel-btn" onclick="cancelEdit(${messageId}, '${escapeHtml(rawText)}')">Cancel</button>
+            </div>
+        `;
+        contentDiv.style.display = 'none';
+        contentDiv.parentNode.insertBefore(editContainer, contentDiv.nextSibling);
+    }
+    
+    function cancelEdit(messageId, originalText) {
+        const contentDiv = document.getElementById('msg-content-' + messageId);
+        if(!contentDiv) return;
+        const editContainer = contentDiv.nextElementSibling;
+        if(editContainer && editContainer.className === 'edit-container') {
+            editContainer.remove();
+        }
+        contentDiv.style.display = 'block';
+    }
+    
+    function saveEdit(messageId) {
+        const textarea = document.getElementById('edit-textarea-' + messageId);
+        if(!textarea) return;
+        const newText = textarea.value.trim();
+        if(!newText) return;
+        
+        const contentDiv = document.getElementById('msg-content-' + messageId);
+        const editContainer = contentDiv.nextElementSibling;
+        
+        editContainer.innerHTML = `<div style="font-size: 12px; color: var(--text-color);"><i class="fas fa-spinner fa-spin"></i> Updating...</div>`;
+        
+        const formData = new FormData();
+        formData.append('message_id', messageId);
+        formData.append('session_id', currentSessionId);
+        formData.append('new_text', newText);
+        
+        fetch('/api/messages/edit', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.error) {
+                alert(data.error);
+                cancelEdit(messageId, contentDiv.getAttribute('data-raw-text'));
+            } else {
+                // Update User Message
+                contentDiv.innerHTML = escapeHtml(newText);
+                contentDiv.setAttribute('data-raw-text', newText);
+                editContainer.remove();
+                contentDiv.style.display = 'block';
+                
+                // If there's an existing bot response, update it. It should be the next message bubble.
+                // Or simply reload the session messages to get the correct state
+                switchSession(currentSessionId);
+            }
+        })
+        .catch(err => {
+            alert("Failed to edit message.");
+            cancelEdit(messageId, contentDiv.getAttribute('data-raw-text'));
+        });
+    }
+
+    function showTypingIndicator() {
+        const typingDiv = document.createElement("div");
+        typingDiv.className = "message bot";
+        typingDiv.id = "typingIndicator";
+        typingDiv.innerHTML = `
+            <div class="bubble typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        `;
+        chatBox.appendChild(typingDiv);
+        scrollToBottom();
+    }
+
+    function removeTypingIndicator() {
+        const typingIndicator = document.getElementById("typingIndicator");
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+
+    // Voice Input Logic
+    let recognition;
+    let isRecording = false;
+    const micBtn = document.getElementById('micBtn');
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = function() {
+            isRecording = true;
+            micBtn.classList.add('recording');
+        };
+
+        recognition.onresult = function(event) {
+            let finalTranscript = '';
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            if (finalTranscript) {
+                userInput.value += (userInput.value ? ' ' : '') + finalTranscript;
+            }
+            autoResize(userInput);
+        };
+
+        recognition.onerror = function(event) {
+            console.error(event.error);
+            stopRecording();
+        };
+
+        recognition.onend = function() {
+            stopRecording();
+        };
+    } else {
+        micBtn.style.display = 'none'; // Not supported
+    }
+
+    function toggleVoiceInput() {
+        if (!recognition) return alert('Speech recognition not supported in this browser.');
+        if (isRecording) {
+            recognition.stop();
+        } else {
+            recognition.start();
+        }
+    }
+
+    function stopRecording() {
+        isRecording = false;
+        micBtn.classList.remove('recording');
+    }
+
+    // File Upload Preview Logic
+    const fileInput = document.getElementById('fileInput');
+    const filePreviewContainer = document.getElementById('filePreviewContainer');
+    let selectedFile = null;
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        selectedFile = file;
+        
+        filePreviewContainer.style.display = 'block';
+        filePreviewContainer.innerHTML = '';
+        
+        const item = document.createElement('div');
+        item.className = 'file-preview-item';
+        
+        if (file.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            item.appendChild(img);
+        } else {
+            item.innerHTML = '<div style="padding: 10px; background: var(--sidebar-bg); border-radius: 8px;"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> ' + file.name + '</div>';
+        }
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-file';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.onclick = () => {
+            selectedFile = null;
+            fileInput.value = '';
+            filePreviewContainer.style.display = 'none';
+        };
+        item.appendChild(removeBtn);
+        
+        filePreviewContainer.appendChild(item);
+    }
+
+    function sendMessage() {
+        let message = userInput.value.trim();
+        if (message === "" && !selectedFile) return;
+        
+        if (!currentSessionId) {
+            alert("No active session. Please start a new conversation.");
+            return;
+        }
+
+        userInput.value = "";
+        userInput.style.height = 'auto';
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+
+        const timeString = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        // Display user message in UI using the metadata pattern temporarily with local Blob URL
+        let userMsgText = message;
+        if (selectedFile) {
+            const blobUrl = URL.createObjectURL(selectedFile);
+            userMsgText += (message ? '\n' : '') + `[file:${blobUrl}|${selectedFile.type}|${selectedFile.name}]`;
+        }
+        
+        const userMsgDiv = appendMessageToDOM(userMsgText, "user", timeString, null, false, null);
+
+        showTypingIndicator();
+
+        // Update title locally if it's the first message
+        let currentConv = conversations.find(c => c.session_id == currentSessionId);
+        if (currentConv && currentConv.title === "New Session" && message) {
+            currentConv.title = message;
+            renderHistoryList();
+        }
+
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('message', message);
+        formData.append('session_id', currentSessionId);
+        if (selectedFile) {
+            formData.append('file', selectedFile);
+        }
+
+        // Clear file right after appending to form data
+        selectedFile = null;
+        fileInput.value = '';
+        filePreviewContainer.style.display = 'none';
+
+        fetch("/chat", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            removeTypingIndicator();
+            const botTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            // Assign message id to user message
+            if (data.user_message_id && userMsgDiv) {
+                userMsgDiv.setAttribute('data-message-id', data.user_message_id);
+                const bubble = userMsgDiv.querySelector('.bubble');
+                const content = bubble.querySelector('.message-content');
+                if (content) content.id = 'msg-content-' + data.user_message_id;
+                
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-msg-btn';
+                editBtn.title = 'Edit Message';
+                editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                editBtn.onclick = () => enableEdit(data.user_message_id);
+                bubble.appendChild(editBtn);
+            }
+            
+            appendMessageToDOM(data.reply, "bot", botTime, data.content_id, true, data.bot_message_id);
+        })
+        .catch(err => {
+            removeTypingIndicator();
+            const botTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            appendMessageToDOM("Sorry, I'm having trouble processing that right now.", "bot", botTime, null, false);
+        })
+        .finally(() => {
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
+        });
+    }
+</script>
+
+</body>
+</html>
