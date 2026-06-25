@@ -1,3 +1,9 @@
+
+// NOTE: Passwords are stored as plain text in this project intentionally,
+// as this is a learning/demonstration project focused on DBMS schema design
+// and AI retrieval architecture. In production, passwords should be hashed
+// using bcrypt or a similar library before storing.
+
 const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
