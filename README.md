@@ -25,6 +25,13 @@ authenticated sessions, file uploads (PDF/image), and saved notes.
 - **File handling:** Multer
 - **Frontend:** Vanilla JS, marked.js (Markdown), highlight.js
 
+  ## Security Note
+Password hashing (e.g., bcrypt) has been intentionally omitted in this 
+version as this project is focused on demonstrating DBMS schema design, 
+keyword-based retrieval, and Gemini API integration rather than 
+production-level auth implementation. A production version would hash 
+passwords before storage.
+
 ## Database Schema
 5 tables:
 - `users` — accounts and credentials
